@@ -108,13 +108,13 @@ let count_message_strict (m_init : pbft_internal) (log_init : pbft_internal list
 
 (* Deliver the client's request to the primary *)
 let deliver_request (req : pbft_request) (r : replica) :
-      (pbft_internal option * replica) =
+      (pbft_internal option * pbft_reply option * replica) =
   if r.primary
   then (let n = r.seq_num in
         let response = Pre_prepare (n, req) in
         let r' = increase_seq_num r in
-        (Some response, r'))
-  else (None, r);;
+        (Some response, None, r'))
+  else (None, None, r);;
 
 (* ****************************** *)
 (*             PHASE 3            *)

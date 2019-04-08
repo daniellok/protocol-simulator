@@ -16,7 +16,9 @@ module type Sim_type =
         handled_requests   : _request  list; (* to persist requests *)
         timestep           : int;
       }
-    val deliver_request     : _request -> _node -> (_internal option * _node)
+    val deliver_request     : _request  -> _node -> (_internal option
+                                                    * _reply option
+                                                    * _node)
     val deliver_internal    : _internal -> _node -> (_internal option
                                                     * _reply option
                                                     * _node)
@@ -28,33 +30,44 @@ module Sim (S : Sim_type) =
   struct
     (* simulates delivering a request to all nodes *)
     let multicast_req (r : S._request) (sim : S._simulator) :
-          (S._internal list * S._node list) =
+          (S._internal list * S._reply list * S._node list) =
       let rec traverse (nodes : S._node list)
-                (acc : S._internal option list * S._node list) =
+                (acc : S._internal option list
+                       * S._reply option list
+                       * S._node list) :
+                (S._internal option list
+                 * S._reply option list
+                 * S._node list) =
         match nodes with
         | [] ->
            acc
         | n :: nodes' ->
-           let int_opt, n'  = S.deliver_request r n           in
-           let int_opts, ns = acc                             in
-           let acc'         = (int_opt :: int_opts, n' :: ns) in
+           let int_opt, rep_opt, n'   = S.deliver_request r n in
+           let int_opts, rep_opts, ns = acc in
+           let acc' = (int_opt :: int_opts, rep_opt :: rep_opts, n' :: ns) in
            traverse nodes' acc'
       in
-      let int_opts, nodes' = traverse sim.nodes ([], []) in
-      let internals        = remove_options int_opts     in
-      (internals, List.rev nodes')
+      let int_opts, rep_opts, nodes' = traverse sim.nodes ([], [], []) in
+      let internals = remove_options int_opts in
+      let replies   = remove_options rep_opts in
+      (internals, replies, List.rev nodes')
 
     let rec deliver_requests (sim : S._simulator) : S._simulator =
       match sim.client_requests with
       | [] ->
          sim
       | r :: requests' ->
-         let internals, nodes = multicast_req r sim in
+         let internals, replies, nodes = multicast_req r sim in
          let sim' = {
-             sim with nodes            = nodes;
-                      message_queue    = sim.message_queue @ internals;
-                      client_requests  = requests';
-                      handled_requests = r :: sim.handled_requests;
+             sim with nodes              = nodes;
+                      next_message_queue = append_uniq
+                                             internals
+                                             sim.next_message_queue;
+                      client_replies     = append_uniq
+                                             replies
+                                             sim.client_replies;
+                      client_requests    = requests';
+                      handled_requests   = r :: sim.handled_requests;
            } in
          deliver_requests sim'
 

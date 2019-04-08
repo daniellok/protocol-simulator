@@ -92,15 +92,16 @@ let req_decide_consume (t : transaction) (s : shard) : shard =
    speaking, we never check the log for the presence of a prepare anyway, and
    validity-checking will not involve checking the logs in general.
  *)
-let deliver_initialize (r : request) (s : shard) : (internal option * shard) =
+let deliver_initialize (r : request) (s : shard) :
+      (internal option * reply option * shard) =
   match r with
   | Initiate t ->
      let concerned_shards = get_concerned_shards t in
      if List.mem s.id concerned_shards
      then (let s'  = req_decide_consume t s in
            let s'' = { s' with log = Prepare t :: s'.log } in
-           (None, s''))
-     else (None, s);;
+           (None, None, s''))
+     else (None, None, s);;
 
 (* ****************************** *)
 (*         Commit / Abort         *)
